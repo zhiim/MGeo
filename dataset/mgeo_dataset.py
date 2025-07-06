@@ -27,7 +27,8 @@ class GisUtt:
         gis_relative_position_ids,
     ):
         gis_input_ids = [
-            [self.cls_token_id] + json.loads(f) for f in gis_input_ids
+            [self.cls_token_id] + json.loads(f)
+            for f in gis_input_ids  # cls + id
         ]
         gis_token_type_ids = [
             [self.pad_token_id] + json.loads(f) for f in gis_token_type_ids
@@ -215,14 +216,14 @@ class pretrain_gis_dataset(IterableDataset):
             if i % total_workers == global_worker_id:
                 dt = json.loads(line)
                 (
-                    geom_id,
-                    geom_type,
-                    rel_type,
-                    absolute_position,
-                    relative_position,
-                    text,
+                    geom_id,  # id
+                    geom_type,  # type: "line" or "polygon"
+                    rel_type,  # realtion type: "near" or "covered"
+                    absolute_position,  # 绝对位置
+                    relative_position,  # 相对位置
+                    text,  # 地理语义文本
                     inst_id,
-                    lxly,
+                    lxly,  # 经纬度
                 ) = dt
                 text = text[: self.max_words]
 

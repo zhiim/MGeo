@@ -59,14 +59,16 @@ def train(
     warmup_iterations = warmup_steps * step_size
 
     for i, (
-        gis_input_ids,
-        gis_token_type_ids,
-        gis_rel_type_ids,
-        gis_absolute_position_ids,
-        gis_relative_position_ids,
-        text,
+        # -- 由dataset的iterator定义 -------------------------------------------
+        gis_input_ids,  # id
+        gis_token_type_ids,  # type
+        gis_rel_type_ids,  # relative type
+        gis_absolute_position_ids,  # position
+        gis_relative_position_ids,  # relative position
+        text,  # geographic text
         text_id,
-        lxlys,
+        lxlys,  # latitude and longitude pairs
+        # ----------------------------------------------------------------------
     ) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
         optimizer.zero_grad()
 
