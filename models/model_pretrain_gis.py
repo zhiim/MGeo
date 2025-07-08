@@ -48,6 +48,7 @@ class MGeo(nn.Module):
         gis_probability_matrix = torch.full(
             gis_labels.shape, self.gis_mlm_probability
         )
+        # -- mask different feature --------------------------------------------
         gis_input_ids, gis_labels = self.mask_gis(
             gis_input_ids,
             self.gis_encoder.config.vocab_size,
@@ -150,6 +151,9 @@ class MGeo(nn.Module):
             probability_matrix=gis_probability_matrix,
         )
 
+        # -- gis 编码器 --------------------------------------------------------
+        # bert + predict head
+        # return: (mlm loss, predict scores, hidden_states, attention)
         gis_return_dic = self.gis_encoder(
             input_ids=gis_input_ids,
             attention_mask=gis.attention_mask,
@@ -168,9 +172,10 @@ class MGeo(nn.Module):
 
         batch_size = len(text.input_ids)
         gis_mlm = gis_return_dic.loss
-        gis_embeds = gis_return_dic.hidden_states[-1]
+        gis_embeds = gis_return_dic.hidden_states[-1]  # bert的最终输出
         gis_atts = gis.attention_mask
 
+        # -- 计算ctl -----------------------------------------------------------
         gis_feat = F.normalize(gis_embeds[:, 0, :], dim=1)
 
         n = len(gis_feat)
@@ -203,6 +208,7 @@ class MGeo(nn.Module):
         masked_indices=None,
         probability_matrix=None,
     ):
+        # generate mask ind according to probability_matrix
         if masked_indices is None:
             masked_indices = torch.bernoulli(probability_matrix).bool()
 
@@ -214,14 +220,16 @@ class MGeo(nn.Module):
                 ~masked_indices
             ] = -100  # We only compute loss on masked tokens
 
-        # 80% of the time, we replace masked input tokens with tokenizer.mask_token ([MASK])
+        # -- mask some token ---------------------------------------------------
+        # (1) 80% of the time, we replace masked input tokens with
+        #     tokenizer.mask_token ([MASK])
         indices_replaced = (
             torch.bernoulli(torch.full(input_ids.shape, 0.8)).bool()
             & masked_indices
         )
         input_ids[indices_replaced] = 2
 
-        # 10% of the time, we replace masked input tokens with random word
+        # (2) 10% of the time, we replace masked input tokens with random word
         indices_random = (
             torch.bernoulli(torch.full(input_ids.shape, 0.5)).bool()
             & masked_indices
@@ -231,7 +239,8 @@ class MGeo(nn.Module):
             vocab_size, input_ids.shape, dtype=torch.long
         ).to(device)
         input_ids[indices_random] = random_words[indices_random]
-        # The rest of the time (10% of the time) we keep the masked input tokens unchanged
+        # (3) The rest of the time (10% of the time) we keep the masked input
+        #     tokens unchanged
 
         if targets is not None:
             return input_ids, targets

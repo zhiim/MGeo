@@ -1031,6 +1031,7 @@ class BertModel(BertPreTrainedModel):
         if config.gis_embedding == 0:
             self.embeddings = BertEmbeddings(config)
         else:
+            # 不同gis特征embedding，然后相加
             self.embeddings = GisEmbeddings(config)
 
         self.encoder = BertEncoder(config)
@@ -1288,6 +1289,7 @@ class BertModel(BertPreTrainedModel):
         # and head_mask is converted to shape [num_hidden_layers x batch x num_heads x seq_length x seq_length]
         head_mask = self.get_head_mask(head_mask, self.config.num_hidden_layers)
 
+        # -- 1. Bert Embedding -------------------------------------------------
         if encoder_embeds is None:
             embedding_output = self.embeddings(
                 input_ids=input_ids,
@@ -1302,6 +1304,7 @@ class BertModel(BertPreTrainedModel):
         else:
             embedding_output = encoder_embeds
 
+        # -- 2. 对bert embedding 进行编码 --------------------------------------
         encoder_outputs = self.encoder(
             embedding_output,
             attention_mask=extended_attention_mask,
@@ -1316,6 +1319,8 @@ class BertModel(BertPreTrainedModel):
             mode=mode,
         )
         sequence_output = encoder_outputs[0]
+
+        # -- 3. pooler ---------------------------------------------------------
         pooled_output = (
             self.pooler(sequence_output) if self.pooler is not None else None
         )
@@ -1773,6 +1778,9 @@ class BertForGisMaskedLM(BertPreTrainedModel):
             absolute_position_ids=absolute_position_ids,
             relative_position_ids=relative_position_ids,
         )
+
+        # output 格式: (last_hidden_state, pooler_output, hidden_states,
+        # attentions)
 
         sequence_output = outputs[0]
 
