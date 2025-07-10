@@ -63,12 +63,15 @@ class MGeo(nn.Module):
         self.cross_entropy_loss = nn.CrossEntropyLoss()
 
     def forward(self, text, gis, gh_labels=None):
+        # 50% 的概率使用语义前向，MLM
         if random.random() < 0.5:
             return self.text_forward(text, gis)
+        # 50% 的概率同时采用GIS前向
         else:
             return self.tg_forward(text, gis)
 
     def text_forward(self, text, gis):
+        """文本前向，不考虑gis"""
         input_ids = text.input_ids.clone()
         labels = input_ids.clone()
 
@@ -80,8 +83,6 @@ class MGeo(nn.Module):
             targets=labels,
             probability_matrix=probability_matrix,
         )
-        gis_input_ids = gis.input_ids
-        gis_labels = gis_input_ids
 
         embedding_output = self.text_encoder.embeddings(input_ids=input_ids)
         text_output = self.text_encoder(
@@ -100,6 +101,9 @@ class MGeo(nn.Module):
         return loss
 
     def tg_forward(self, text, gis):
+        # -- 多模态MLM和MGM ----------------------------------------------------
+        # 50% mask gis
+        # 50% mask text
         if random.random() < 0.5:
             gis_input_ids = gis.input_ids.clone()
             gis_labels = gis_input_ids.clone()
@@ -128,6 +132,7 @@ class MGeo(nn.Module):
             gis_input_ids = gis.input_ids
             gis_labels = gis_input_ids
 
+        # -- gis embedding -----------------------------------------------------
         gis_output = self.gis_encoder(
             input_ids=gis_input_ids,
             attention_mask=gis.attention_mask,
@@ -141,7 +146,10 @@ class MGeo(nn.Module):
         gis_embeds = gis_output.last_hidden_state
         gis_atts = gis.attention_mask
 
+        # -- text embedding ----------------------------------------------------
         embedding_output = self.text_encoder.embeddings(input_ids=input_ids)
+
+        # 混合 text embedding 和 gis embedding
         merge_emb = torch.cat(
             [embedding_output, self.gis2text(gis_embeds)], dim=1
         )
@@ -149,6 +157,7 @@ class MGeo(nn.Module):
             [text.attention_mask, gis.attention_mask], dim=-1
         )
 
+        # 多模态融合
         text_output = self.text_encoder(
             attention_mask=merge_attention,
             encoder_embeds=merge_emb,
